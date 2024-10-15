@@ -14,10 +14,9 @@ export const getDictionary = async (locale) => {
     const files = globSync('**/*.md', {
         cwd: join(blogDir, locale),
     })
-    const htmlFiles = await Promise.all(files.map(async (file) => {
+    return await Promise.all(files.map(async (file) => {
         const content = readFileSync(join(blogDir, locale, file))
         const result = await unified().use(remarkParse).use(remarkRehype).use(rehypeSanitize).use(rehypeStringify).process(content)
         return String(result)
     }))
-    return htmlFiles
 }
