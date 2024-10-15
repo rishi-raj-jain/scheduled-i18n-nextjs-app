@@ -7,7 +7,8 @@ interface RequestPayload {
 }
 
 interface FolderContents {
-    files?: any[];
+    name: string;
+    download_url: string;
 }
 
 interface OpenAiResponse {
@@ -28,9 +29,8 @@ const defaultRequestPayload: RequestPayload = {
 export const POST = serve(async (context) => {
     const { repo = defaultRequestPayload.repo, folder = defaultRequestPayload.folder, newLang = defaultRequestPayload.newLang } = context.requestPayload as RequestPayload || defaultRequestPayload;
     if (!folder || !repo || !newLang) return
-    const fetchResult = await context.call<FolderContents>("fetch-" + repo + folder, `https://api.github.com/repos/${repo}/contents/${folder}`, 'GET');
-    if (!fetchResult.files || !Array.isArray(fetchResult.files)) return
-    for (const file of fetchResult.files) {
+    const fetchResult = await context.call<FolderContents[]>("fetch-" + repo + folder, `https://api.github.com/repos/${repo}/contents/${folder}`, 'GET');
+    for (const file of fetchResult) {
         const fileContent = await context.call<string>(`fetch-${file.name}`, file.download_url, 'GET');
         const translationResult = await context.call<OpenAiResponse>(`translate-${file.name}`, "https://api.openai.com/v1/chat/completions", 'POST', {
             model: 'gpt-4o-mini',
