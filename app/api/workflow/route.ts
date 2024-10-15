@@ -31,8 +31,8 @@ export const POST = serve(async (context) => {
     if (!folder || !repo || !newLang) return
     const fetchResult = await context.call<FolderContents[]>("fetch-" + repo + folder, `https://api.github.com/repos/${repo}/contents/${folder}`, 'GET');
     for (const file of fetchResult) {
-        const fileContent = await context.call<string>(`fetch-${file.name}`, file.download_url, 'GET');
-        const translationResult = await context.call<OpenAiResponse>(`translate-${file.name}`, "https://api.openai.com/v1/chat/completions", 'POST', {
+        const fileContent = await context.call<string>(`fetch-${folder}/${file.name}`, file.download_url, 'GET');
+        const translationResult = await context.call<OpenAiResponse>(`translate-${folder}/${file.name}`, "https://api.openai.com/v1/chat/completions", 'POST', {
             model: 'gpt-4o-mini',
             messages: [
                 {
@@ -46,10 +46,16 @@ export const POST = serve(async (context) => {
             ],
             max_tokens: 4000,
         },
-            { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` });
-        await context.call(`commit-${file.name.replace('en', newLang)}`, `https://api.github.com/repos/${repo}/contents/${folder.replace('en', newLang)}/${file.name}`, 'PUT', {
+            {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+            });
+        const existingFileResponse = await context.call<{ sha: string }>(`fetch-sha-${folder.replace('en', newLang)}/${file.name}`, `https://api.github.com/repos/${repo}/contents/${folder.replace('en', newLang)}/${file.name}`, 'GET');
+        const sha = existingFileResponse?.sha;
+        await context.call(`commit-${folder.replace('en', newLang)}/${file.name}`, `https://api.github.com/repos/${repo}/contents/${folder.replace('en', newLang)}/${file.name}`, 'PUT', {
+            ...(sha && { sha }),
             message: `Add translated file ${file.name} to ${newLang} locale`,
-            content: Buffer.from(translationResult.choices[0].message.content.trim()).toString('base64')
+            content: Buffer.from(translationResult.choices[0].message.content.trim()).toString('base64'),
         },
             {
                 'Content-Type': 'application/json',
