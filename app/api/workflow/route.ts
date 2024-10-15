@@ -20,6 +20,25 @@ interface OpenAiResponse {
     }[]
 }
 
+interface ExistingFileResponse {
+    sha: string;
+}
+
+interface TranslationRequest {
+    model: string;
+    messages: {
+        role: string;
+        content: string;
+    }[];
+    max_tokens: number;
+}
+
+interface CommitRequest {
+    sha?: string;
+    message: string;
+    content: string;
+}
+
 const defaultRequestPayload: RequestPayload = {
     repo: 'rishi-raj-jain/scheduled-i18n-nextjs-app',
     folder: 'app/blogs/en',
@@ -28,11 +47,13 @@ const defaultRequestPayload: RequestPayload = {
 
 export const POST = serve(async (context) => {
     const { repo = defaultRequestPayload.repo, folder = defaultRequestPayload.folder, newLang = defaultRequestPayload.newLang } = context.requestPayload as RequestPayload || defaultRequestPayload;
-    if (!folder || !repo || !newLang) return
-    const fetchResult = await context.call<FolderContents[]>("fetch-" + repo + folder, `https://api.github.com/repos/${repo}/contents/${folder}`, 'GET');
+    if (!folder || !repo || !newLang) return;
+    const fetchUrl = `https://api.github.com/repos/${repo}/contents/${folder}`;
+    const fetchResult = await context.call<FolderContents[]>(`fetch-${repo}-${folder}`, fetchUrl, 'GET');
     for (const file of fetchResult) {
-        const fileContent = await context.call<string>(`fetch-${folder}/${file.name}`, file.download_url, 'GET');
-        const translationResult = await context.call<OpenAiResponse>(`translate-${folder}/${file.name}`, "https://api.openai.com/v1/chat/completions", 'POST', {
+        const fileContentUrl = file.download_url;
+        const fileContent = await context.call<string>(`fetch-${folder}/${file.name}`, fileContentUrl, 'GET');
+        const translationRequest: TranslationRequest = {
             model: 'gpt-4o-mini',
             messages: [
                 {
@@ -45,22 +66,23 @@ export const POST = serve(async (context) => {
                 },
             ],
             max_tokens: 4000,
-        },
-            {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
-            });
-        const existingFileResponse = await context.call<{ sha: string }>(`fetch-sha-${folder.replace('en', newLang)}/${file.name}`, `https://api.github.com/repos/${repo}/contents/${folder.replace('en', newLang)}/${file.name}`, 'GET');
+        };
+        const translationResult = await context.call<OpenAiResponse>(`translate-${folder}/${file.name}`, "https://api.openai.com/v1/chat/completions", 'POST', translationRequest, {
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+        });
+        const newFolder = folder.replace('en', newLang);
+        const existingFileUrl = `https://api.github.com/repos/${repo}/contents/${newFolder}/${file.name}`;
+        const existingFileResponse = await context.call<ExistingFileResponse>(`fetch-sha-${newFolder}/${file.name}`, existingFileUrl, 'GET');
         const sha = existingFileResponse?.sha;
-        await context.call(`commit-${folder.replace('en', newLang)}/${file.name}`, `https://api.github.com/repos/${repo}/contents/${folder.replace('en', newLang)}/${file.name}`, 'PUT', {
+        const commitRequest: CommitRequest = {
             ...(sha && { sha }),
             message: `Add translated file ${file.name} to ${newLang} locale`,
             content: Buffer.from(translationResult.choices[0].message.content.trim()).toString('base64'),
-        },
-            {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${process.env.GITHUB_TOKEN}`
-            })
+        };
+        await context.call(`commit-${newFolder}/${file.name}`, existingFileUrl, 'PUT', commitRequest, {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${process.env.GITHUB_TOKEN}`
+        });
     }
 }, {
     verbose: true
