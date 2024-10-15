@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@upstash/qstash": "^2.7.12",
     "fast-glob": "^3.3.2",
     "next": "14.2.15",
     "react": "^18",
