@@ -1,7 +1,7 @@
 import { getDictionary } from './blogs'
 
 export async function generateStaticParams() {
-  return ['en'].map((lang) => ({
+  return ['en', 'fr'].map((lang) => ({
     lang,
   }))
 }
