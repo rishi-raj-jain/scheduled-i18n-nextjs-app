@@ -50,7 +50,7 @@ export const POST = serve(async (context) => {
     if (!folder || !repo || !newLang) return;
     const fetchUrl = `https://api.github.com/repos/${repo}/contents/${folder}`;
     const fetchResult = await context.call<FolderContents[]>(`fetch-${repo}-${folder}`, fetchUrl, 'GET');
-    for (const file of fetchResult) {
+    await Promise.all(fetchResult.map(async (file) => {
         const fileContentUrl = file.download_url;
         const fileContent = await context.call<string>(`fetch-${folder}/${file.name}`, fileContentUrl, 'GET');
         const translationRequest: TranslationRequest = {
@@ -72,8 +72,8 @@ export const POST = serve(async (context) => {
         });
         const newFolder = folder.replace('en', newLang);
         const existingFileUrl = `https://api.github.com/repos/${repo}/contents/${newFolder}/${file.name}`;
-        const existingFileResponse = await context.call<ExistingFileResponse>(`fetch-sha-${newFolder}/${file.name}`, existingFileUrl, 'GET');
-        const sha = existingFileResponse?.sha;
+        const existingFileResponse = await context.call<ExistingFileResponse>(`fetch-sha-${newFolder}/${file.name}`, existingFileUrl, 'GET').catch(() => null);
+        const sha = existingFileResponse?.['sha'];
         const commitRequest: CommitRequest = {
             ...(sha && { sha }),
             message: `Add translated file ${file.name} to ${newLang} locale`,
@@ -83,7 +83,7 @@ export const POST = serve(async (context) => {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${process.env.GITHUB_TOKEN}`
         });
-    }
+    }));
 }, {
     verbose: true
 });
