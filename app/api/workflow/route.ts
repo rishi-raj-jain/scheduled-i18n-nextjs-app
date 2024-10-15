@@ -71,17 +71,31 @@ export const POST = serve(async (context) => {
             Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
         });
         const newFolder = folder.replace('en', newLang);
-        const existingFileUrl = `https://api.github.com/repos/${repo}/contents/${newFolder}/${file.name}`;
-        const existingFileResponse = await context.call<ExistingFileResponse>(`fetch-sha-${newFolder}/${file.name}`, existingFileUrl, 'GET').catch(() => null);
-        const sha = existingFileResponse?.['sha'];
-        const commitRequest: CommitRequest = {
-            ...(sha && { sha }),
-            message: `Add translated file ${file.name} to ${newLang} locale`,
-            content: Buffer.from(translationResult.choices[0].message.content.trim()).toString('base64'),
-        };
-        await context.call(`commit-${newFolder}/${file.name}`, existingFileUrl, 'PUT', commitRequest, {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${process.env.GITHUB_TOKEN}`
+        await context.run(`commit-${newFolder}/${file.name}`, async () => {
+            const existingFileUrl = `https://api.github.com/repos/${repo}/contents/${newFolder}/${file.name}`;
+            const existingFileResponse = await fetch(existingFileUrl, {
+                headers: {
+                    Authorization: `Bearer ${process.env.GITHUB_TOKEN}`
+                }
+            });
+            let sha = null;
+            if (existingFileResponse.ok) {
+                const existingFileResponseJson = await existingFileResponse.json();
+                sha = existingFileResponseJson?.['sha'];
+            } 
+            const commitRequest: CommitRequest = {
+                ...(sha && { sha }),
+                message: `Add translated file ${file.name} to ${newLang} locale`,
+                content: Buffer.from(translationResult.choices[0].message.content.trim()).toString('base64'),
+            };
+            await fetch(existingFileUrl, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${process.env.GITHUB_TOKEN}`
+                },
+                body: JSON.stringify(commitRequest)
+            });
         });
     }
 }, {
