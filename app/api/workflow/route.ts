@@ -78,7 +78,7 @@ export const POST = serve(async (context) => {
             if (existingFileResponse.ok) {
                 const existingFileResponseJson = await existingFileResponse.json();
                 sha = existingFileResponseJson?.['sha'];
-            } 
+            }
             const commitRequest: CommitRequest = {
                 ...(sha && { sha }),
                 message: `Add translated file ${file.name} to ${newLang} locale`,
@@ -93,6 +93,9 @@ export const POST = serve(async (context) => {
                 body: JSON.stringify(commitRequest)
             });
         });
+    }
+    if (process.env.VERCEL_DEPLOY_HOOK_URL) {
+        await context.call('deploy-to-vercel', process.env.VERCEL_DEPLOY_HOOK_URL, 'POST')
     }
 }, {
     verbose: true
