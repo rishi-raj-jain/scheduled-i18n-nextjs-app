@@ -1,4 +1,4 @@
-import { serve } from "@upstash/qstash/nextjs"
+import { serve } from "@upstash/qstash/nextjs";
 
 interface RequestPayload {
     repo?: string;
@@ -18,10 +18,6 @@ interface OpenAiResponse {
             content: string
         }
     }[]
-}
-
-interface ExistingFileResponse {
-    sha: string;
 }
 
 interface TranslationRequest {
