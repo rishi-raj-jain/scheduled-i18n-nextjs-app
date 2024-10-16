@@ -13,7 +13,7 @@ In this repository, you will find the code for automated internationalization (i
 
 ## Demo
 
-TODO - https://github.com/user-attachments/assets/9d1484be-2a69-4659-8873-5f8a2f3eb8eb
+https://github.com/user-attachments/assets/4df0dd4c-f8ae-4bb6-8d3b-4bf45a088124
 
 ## One-click Deploy
 
