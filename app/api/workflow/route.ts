@@ -46,7 +46,7 @@ export const POST = serve(async (context) => {
     if (!folder || !repo || !newLang) return;
     const fetchUrl = `https://api.github.com/repos/${repo}/contents/${folder}`;
     const fetchResult = await context.call<FolderContents[]>(`fetch-${repo}-${folder}`, fetchUrl, 'GET');
-    await Promise.all(fetchResult.map(async (file) => {
+    for (const file of fetchResult) {
         const fileContent = await context.call<string>(`fetch-${folder}/${file.name}`, file.download_url, 'GET', null, {
             Authorization: `Bearer ${process.env.GITHUB_TOKEN}`
         });
@@ -81,10 +81,10 @@ export const POST = serve(async (context) => {
                 sha = existingFileResponseJson?.['sha'];
             }
             const commitRequest: CommitRequest = {
-                ...(sha && { sha }),
                 message: `Add translated file ${file.name} to ${newLang} locale`,
                 content: Buffer.from(translationResult.choices[0].message.content.trim()).toString('base64'),
             };
+            if (sha) commitRequest['sha'] = sha;
             await fetch(existingFileUrl, {
                 method: 'PUT',
                 headers: {
@@ -94,7 +94,7 @@ export const POST = serve(async (context) => {
                 body: JSON.stringify(commitRequest)
             });
         });
-    }));
+    }
     if (process.env.VERCEL_DEPLOY_HOOK_URL) {
         await context.call('deploy-to-vercel', process.env.VERCEL_DEPLOY_HOOK_URL, 'POST')
         }
