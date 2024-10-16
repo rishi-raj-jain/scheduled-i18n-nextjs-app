@@ -7,6 +7,16 @@ const defaultRequestPayload: RequestPayload = {
   newLang: 'fr',
 }
 
+const githubHeaders = {
+  'Content-Type': 'application/json',
+  Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+}
+
+const openaiHeaders = {
+  'Content-Type': 'application/json',
+  Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+}
+
 export const POST = serve(
   async (context) => {
     // Destructure the request payload or use default values
@@ -27,9 +37,7 @@ export const POST = serve(
     // Iterate over each file in the folder
     for (const file of fetchResult) {
       // Fetch the content of the file
-      const fileContent = await context.call<string>(`fetch-${folder}/${file.name}`, file.download_url, 'GET', null, {
-        Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
-      })
+      const fileContent = await context.call<string>(`fetch-${folder}/${file.name}`, file.download_url, 'GET', null, githubHeaders)
 
       // Prepare the translation request payload
       const translationRequest: TranslationRequest = {
@@ -48,9 +56,7 @@ export const POST = serve(
       }
 
       // Call the OpenAI API to get the translation
-      const translationResult = await context.call<OpenAiResponse>(`translate-${folder}/${file.name}`, 'https://api.openai.com/v1/chat/completions', 'POST', translationRequest, {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      })
+      const translationResult = await context.call<OpenAiResponse>(`translate-${folder}/${file.name}`, 'https://api.openai.com/v1/chat/completions', 'POST', translationRequest, openaiHeaders)
 
       // Determine the new folder path for the translated file
       const newFolder = folder.replace('en', newLang)
@@ -59,9 +65,7 @@ export const POST = serve(
       await context.run(`commit-${newFolder}/${file.name}`, async () => {
         const existingFileUrl = `https://api.github.com/repos/${repo}/contents/${newFolder}/${file.name}`
         const existingFileResponse = await fetch(existingFileUrl, {
-          headers: {
-            Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
-          },
+          headers: githubHeaders,
         })
 
         // Check if the file already exists and get its SHA if it does
@@ -81,10 +85,7 @@ export const POST = serve(
         // Commit the translated file to GitHub
         await fetch(existingFileUrl, {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
-          },
+          headers: githubHeaders,
           body: JSON.stringify(commitRequest),
         })
       })
