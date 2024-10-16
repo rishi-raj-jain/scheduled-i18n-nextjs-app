@@ -1,39 +1,5 @@
 import { serve } from '@upstash/qstash/nextjs'
-
-interface RequestPayload {
-  repo?: string
-  folder?: string
-  newLang?: string
-}
-
-interface FolderContents {
-  name: string
-  download_url: string
-}
-
-interface OpenAiResponse {
-  choices: {
-    message: {
-      role: string
-      content: string
-    }
-  }[]
-}
-
-interface TranslationRequest {
-  model: string
-  messages: {
-    role: string
-    content: string
-  }[]
-  max_tokens: number
-}
-
-interface CommitRequest {
-  sha?: string
-  message: string
-  content: string
-}
+import { CommitRequest, FolderContents, OpenAiResponse, RequestPayload, TranslationRequest } from './types'
 
 const defaultRequestPayload: RequestPayload = {
   repo: 'rishi-raj-jain/scheduled-i18n-nextjs-app',
@@ -43,18 +9,29 @@ const defaultRequestPayload: RequestPayload = {
 
 export const POST = serve(
   async (context) => {
+    // Destructure the request payload or use default values
     const {
       repo = defaultRequestPayload.repo,
       folder = defaultRequestPayload.folder,
       newLang = defaultRequestPayload.newLang,
     } = (context.requestPayload as RequestPayload) || defaultRequestPayload
+
+    // If any of the required fields are missing, exit early
     if (!folder || !repo || !newLang) return
+
+    // Construct the URL to fetch the folder contents from GitHub
     const fetchUrl = `https://api.github.com/repos/${repo}/contents/${folder}`
+    // Fetch the folder contents
     const fetchResult = await context.call<FolderContents[]>(`fetch-${repo}-${folder}`, fetchUrl, 'GET')
+
+    // Iterate over each file in the folder
     for (const file of fetchResult) {
+      // Fetch the content of the file
       const fileContent = await context.call<string>(`fetch-${folder}/${file.name}`, file.download_url, 'GET', null, {
         Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
       })
+
+      // Prepare the translation request payload
       const translationRequest: TranslationRequest = {
         model: 'gpt-4o-mini',
         messages: [
@@ -69,10 +46,16 @@ export const POST = serve(
         ],
         max_tokens: 4000,
       }
+
+      // Call the OpenAI API to get the translation
       const translationResult = await context.call<OpenAiResponse>(`translate-${folder}/${file.name}`, 'https://api.openai.com/v1/chat/completions', 'POST', translationRequest, {
         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
       })
+
+      // Determine the new folder path for the translated file
       const newFolder = folder.replace('en', newLang)
+
+      // Commit the translated file to the new folder
       await context.run(`commit-${newFolder}/${file.name}`, async () => {
         const existingFileUrl = `https://api.github.com/repos/${repo}/contents/${newFolder}/${file.name}`
         const existingFileResponse = await fetch(existingFileUrl, {
@@ -80,16 +63,22 @@ export const POST = serve(
             Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
           },
         })
+
+        // Check if the file already exists and get its SHA if it does
         let sha = null
         if (existingFileResponse.ok) {
           const existingFileResponseJson = await existingFileResponse.json()
           sha = existingFileResponseJson?.['sha']
         }
+
+        // Prepare the commit request payload
         const commitRequest: CommitRequest = {
           message: `Add translated file ${file.name} to ${newLang} locale`,
           content: Buffer.from(translationResult.choices[0].message.content.trim()).toString('base64'),
         }
         if (sha) commitRequest['sha'] = sha
+
+        // Commit the translated file to GitHub
         await fetch(existingFileUrl, {
           method: 'PUT',
           headers: {
@@ -100,6 +89,8 @@ export const POST = serve(
         })
       })
     }
+
+    // Trigger a deployment to Vercel if the deploy hook URL is set
     if (process.env.VERCEL_DEPLOY_HOOK_URL) await context.call('deploy-to-vercel', process.env.VERCEL_DEPLOY_HOOK_URL, 'POST')
   },
   {

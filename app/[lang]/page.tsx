@@ -6,7 +6,7 @@ export async function generateStaticParams() {
   }))
 }
 
-export default async function Page({ params: { lang } }) {
+export default async function Page({ params: { lang } }: { params: { lang: string } }) {
   const dict = await getDictionary(lang)
   return (
     <div className="prose flex flex-col gap-4">

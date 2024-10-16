@@ -10,7 +10,7 @@ import { unified } from 'unified'
 
 const blogDir = join(process.cwd(), 'app', 'blogs')
 
-export const getDictionary = async (locale) => {
+export const getDictionary = async (locale: string) => {
   const langDir = join(blogDir, locale)
   if (!existsSync(langDir)) return []
   const files = globSync('**/*.md', { cwd: langDir })
