@@ -46,9 +46,10 @@ export const POST = serve(async (context) => {
     if (!folder || !repo || !newLang) return;
     const fetchUrl = `https://api.github.com/repos/${repo}/contents/${folder}`;
     const fetchResult = await context.call<FolderContents[]>(`fetch-${repo}-${folder}`, fetchUrl, 'GET');
-    for (const file of fetchResult) {
-        const fileContentUrl = file.download_url;
-        const fileContent = await context.call<string>(`fetch-${folder}/${file.name}`, fileContentUrl, 'GET');
+    await Promise.all(fetchResult.map(async (file) => {
+        const fileContent = await context.call<string>(`fetch-${folder}/${file.name}`, file.download_url, 'GET', null, {
+            Authorization: `Bearer ${process.env.GITHUB_TOKEN}`
+        });
         const translationRequest: TranslationRequest = {
             model: 'gpt-4o-mini',
             messages: [
@@ -93,10 +94,10 @@ export const POST = serve(async (context) => {
                 body: JSON.stringify(commitRequest)
             });
         });
-    }
+    }));
     if (process.env.VERCEL_DEPLOY_HOOK_URL) {
         await context.call('deploy-to-vercel', process.env.VERCEL_DEPLOY_HOOK_URL, 'POST')
-    }
-}, {
-    verbose: true
-});
+        }
+    }, {
+        verbose: true
+    });
