@@ -4,7 +4,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "fmt": "prettier --write **/* --ignore-unknown"
+    "fmt": "prettier --write '**/*' --ignore-unknown"
   },
   "dependencies": {
     "@upstash/qstash": "^2.7.12",
