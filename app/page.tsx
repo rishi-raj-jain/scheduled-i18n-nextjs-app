@@ -1,8 +1,10 @@
+import Link from 'next/link'
+
 export default function () {
   return (
     <>
-      <a href="/en">English Blogs &rarr;</a>
-      <a href="/fr">French Blogs &rarr;</a>
+      <Link href="/en">English Blogs &rarr;</Link>
+      <Link href="/fr">French Blogs &rarr;</Link>
     </>
   )
 }
