@@ -10,9 +10,7 @@ export default async function Page({ params: { lang } }: { params: { lang: strin
   const dict = await getDictionary(lang)
   return (
     <div className="prose flex flex-col gap-4">
-      {dict.map((item, ind) => (
-        <div key={ind} dangerouslySetInnerHTML={{ __html: item }} />
-      ))}
+      {dict.length > 0 ? dict.map((item, ind) => <div key={ind} dangerouslySetInnerHTML={{ __html: item }} />) : <span>No data</span>}
     </div>
   )
 }
