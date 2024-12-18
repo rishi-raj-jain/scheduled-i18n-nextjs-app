@@ -17,7 +17,7 @@ const openaiHeaders = {
   Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
 }
 
-export const POST = serve(
+export const { POST } = serve(
   async (context) => {
     // Destructure the request payload or use default values
     const {
