@@ -59,8 +59,8 @@ export const { POST } = serve(
       const { body: translationResult } = await context.call<OpenAiResponse>(`translate-${folder}/${file.name}`, {
         url: 'https://api.openai.com/v1/chat/completions',
         method: 'POST',
-        body: JSON.stringify(translationRequest),
         headers: openaiHeaders,
+        body: translationRequest,
       })
 
       // Determine the new folder path for the translated file
