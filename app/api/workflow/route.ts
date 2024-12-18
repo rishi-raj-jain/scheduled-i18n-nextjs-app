@@ -1,10 +1,10 @@
-import { serve } from '@upstash/qstash/nextjs'
+import { serve } from '@upstash/workflow/nextjs'
 import { CommitRequest, FolderContents, OpenAiResponse, RequestPayload, TranslationRequest } from './types'
 
 const defaultRequestPayload: RequestPayload = {
-  repo: 'rishi-raj-jain/scheduled-i18n-nextjs-app',
-  folder: 'app/blogs/en',
   newLang: 'fr',
+  folder: 'app/blogs/en',
+  repo: 'rishi-raj-jain/scheduled-i18n-nextjs-app',
 }
 
 const githubHeaders = {
@@ -32,12 +32,12 @@ export const POST = serve(
     // Construct the URL to fetch the folder contents from GitHub
     const fetchUrl = `https://api.github.com/repos/${repo}/contents/${folder}`
     // Fetch the folder contents
-    const fetchResult = await context.call<FolderContents[]>(`fetch-${repo}-${folder}`, fetchUrl, 'GET')
+    const { body: fetchResult } = await context.call<FolderContents[]>(`fetch-${repo}-${folder}`, { url: fetchUrl, method: 'GET' })
 
     // Iterate over each file in the folder
     for (const file of fetchResult) {
       // Fetch the content of the file
-      const fileContent = await context.call<string>(`fetch-${folder}/${file.name}`, file.download_url, 'GET', null, githubHeaders)
+      const { body: fileContent } = await context.call<string>(`fetch-${folder}/${file.name}`, { url: file.download_url, method: 'GET', headers: githubHeaders })
 
       // Prepare the translation request payload
       const translationRequest: TranslationRequest = {
@@ -56,7 +56,12 @@ export const POST = serve(
       }
 
       // Call the OpenAI API to get the translation
-      const translationResult = await context.call<OpenAiResponse>(`translate-${folder}/${file.name}`, 'https://api.openai.com/v1/chat/completions', 'POST', translationRequest, openaiHeaders)
+      const { body: translationResult } = await context.call<OpenAiResponse>(`translate-${folder}/${file.name}`, {
+        url: 'https://api.openai.com/v1/chat/completions',
+        method: 'POST',
+        body: JSON.stringify(translationRequest),
+        headers: openaiHeaders,
+      })
 
       // Determine the new folder path for the translated file
       const newFolder = folder.replace('en', newLang)
@@ -92,7 +97,7 @@ export const POST = serve(
     }
 
     // Trigger a deployment to Vercel if the deploy hook URL is set
-    if (process.env.VERCEL_DEPLOY_HOOK_URL) await context.call('deploy-to-vercel', process.env.VERCEL_DEPLOY_HOOK_URL, 'POST')
+    if (process.env.VERCEL_DEPLOY_HOOK_URL) await context.call('deploy-to-vercel', { url: process.env.VERCEL_DEPLOY_HOOK_URL, method: 'POST' })
   },
   {
     verbose: true,
